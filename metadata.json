@@ -1,0 +1,5 @@
+{
+  "name": "Tesla Parts Store",
+  "description": "Интернет-магазин автозапчастей Tesla с каталогом, поиском и фильтрацией.",
+  "requestFramePermissions": []
+}
