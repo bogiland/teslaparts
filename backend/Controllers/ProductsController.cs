@@ -70,6 +70,7 @@ namespace TeslaStore.Controllers
             }
         }
 
+
         [HttpDelete("{id}")]
         [AdminMod(RoleNames.Admin)]
         public IActionResult DeleteProduct(int id)
@@ -81,7 +82,6 @@ namespace TeslaStore.Controllers
             }
             catch (KeyNotFoundException)
             {
-                return NotFound();
             }
         }
     }
