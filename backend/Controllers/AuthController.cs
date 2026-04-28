@@ -90,6 +90,7 @@ namespace TeslaStore.Controllers
                 expires: DateTime.Now.AddHours(1),
                 signingCredentials: creds);
 
+
             return Ok(new { token = new JwtSecurityTokenHandler().WriteToken(token) });
         }
     }
