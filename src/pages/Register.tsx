@@ -9,7 +9,41 @@ export default function Register() {
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const getValidationErrors = (
+    usernameValue: string,
+    passwordValue: string,
+  ) => {
+    const errors: string[] = [];
+    const trimmedUsername = usernameValue.trim();
+
+    if (trimmedUsername.length < 4) {
+      errors.push("Имя должно содержать минимум 4 символа.");
+    }
+
+    if (passwordValue.length < 5) {
+      errors.push("Пароль должен быть минимум 5 символов.");
+    }
+
+    if (!/[A-ZА-Я]/.test(passwordValue)) {
+      errors.push("Пароль должен содержать хотя бы одну заглавную букву.");
+    }
+
+    if (!/\d/.test(passwordValue)) {
+      errors.push("Пароль должен содержать хотя бы одну цифру.");
+    }
+
+    return errors;
+  };
+
+  const validationErrors = getValidationErrors(username, password);
+
   const handleSubmit = async () => {
+    const errors = getValidationErrors(username, password);
+    if (errors.length > 0) {
+      setNotice(errors.join(" "));
+      return;
+    }
+
     setLoading(true);
     setNotice(null);
 
@@ -105,6 +139,19 @@ export default function Register() {
                 />
               </div>
             </label>
+
+            {validationErrors.length > 0 && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                <p className="mb-2 font-semibold">
+                  Требования к паролю и логину:
+                </p>
+                <ul className="list-inside list-disc space-y-1">
+                  {validationErrors.map((error) => (
+                    <li key={error}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <button
               type="button"

@@ -71,7 +71,14 @@ export default function Header({
                 <Settings className="h-4 w-4" />
                 Admin
               </Link>
-            ) : null
+            ) : (
+              <Link
+                to="/profile"
+                className={`transition-colors ${isActive("/profile")}`}
+              >
+                Account
+              </Link>
+            )
           ) : (
             <>
               <Link

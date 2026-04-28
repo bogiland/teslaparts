@@ -54,6 +54,23 @@ export default function Admin({ onLogout }: AdminProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const [roleForm, setRoleForm] = useState<RoleForm>(emptyRoleForm);
   const [roleLoading, setRoleLoading] = useState(false);
+  const [orders, setOrders] = useState<
+    | {
+        id: number;
+        username: string;
+        items: {
+          productId: number;
+          name: string;
+          price: number;
+          quantity: number;
+        }[];
+        total: number;
+        status: string;
+        createdAt: string;
+      }[]
+    | []
+  >([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
 
   const currentUser = getCurrentUser();
   if (!currentUser || currentUser.role !== "Администратор") {
@@ -95,6 +112,7 @@ export default function Admin({ onLogout }: AdminProps) {
 
   useEffect(() => {
     void fetchProducts();
+    void fetchOrders();
   }, []);
 
   const filteredProducts = useMemo(
@@ -232,6 +250,52 @@ export default function Admin({ onLogout }: AdminProps) {
     }
   };
 
+  const fetchOrders = async () => {
+    setOrdersLoading(true);
+    setNotice(null);
+
+    try {
+      const response = await fetch("/api/orders", {
+        headers: authHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to load orders");
+      }
+
+      const data = await response.json();
+      setOrders(data);
+    } catch (error) {
+      console.error("Failed to load orders:", error);
+      setOrders([]);
+      setNotice("Не удалось загрузить заказы.");
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const handleUpdateOrderStatus = async (orderId: number, status: string) => {
+    setNotice(null);
+
+    try {
+      const response = await fetch(`/api/orders/${orderId}/status`, {
+        method: "PUT",
+        headers: authHeaders(true),
+        body: JSON.stringify({ status }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update order status");
+      }
+
+      setNotice(`Status заказа #${orderId} обновлен.`);
+      await fetchOrders();
+    } catch (error) {
+      console.error("Update order status failed:", error);
+      setNotice("Не удалось обновить статус заказа.");
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 pt-24 sm:px-6 lg:px-8">
       <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-start">
@@ -310,6 +374,103 @@ export default function Admin({ onLogout }: AdminProps) {
             {roleLoading ? "Saving..." : "Update role"}
           </button>
         </div>
+      </div>
+
+      <div className="mb-8 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <div className="mb-4 flex items-center gap-2">
+          <UserCog className="h-5 w-5 text-zinc-500" />
+          <h2 className="text-lg font-semibold text-zinc-900">Orders</h2>
+        </div>
+
+        {ordersLoading ? (
+          <div className="flex justify-center py-10">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
+          </div>
+        ) : orders.length === 0 ? (
+          <p className="text-zinc-500">Заказы пока не оформлялись.</p>
+        ) : (
+          <div className="space-y-4">
+            {orders.map((order) => (
+              <div
+                key={order.id}
+                className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="text-sm text-zinc-500">
+                      Заказ #{order.id}
+                    </div>
+                    <div className="mt-1 text-lg font-semibold text-zinc-900">
+                      {new Date(order.createdAt).toLocaleString("ru-RU")}
+                    </div>
+                    <div className="text-sm text-zinc-500">
+                      Пользователь: {order.username}
+                    </div>
+                  </div>
+                  <div className="rounded-full bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800">
+                    {order.status}
+                  </div>
+                </div>
+
+                <div className="mt-4 border-t border-zinc-200 pt-4 text-sm text-zinc-700">
+                  <div className="mb-3 font-medium text-zinc-900">
+                    Содержимое заказа
+                  </div>
+                  <div className="space-y-2">
+                    {order.items.map((item) => (
+                      <div
+                        key={`${order.id}-${item.productId}`}
+                        className="flex items-center justify-between gap-3"
+                      >
+                        <div>
+                          <div className="font-medium text-zinc-900">
+                            {item.name}
+                          </div>
+                          <div className="text-zinc-500">
+                            Количество: {item.quantity}
+                          </div>
+                        </div>
+                        <div className="font-semibold text-zinc-900">
+                          ${item.price * item.quantity}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-4 border-t border-zinc-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="font-medium text-zinc-900">
+                    Итого: ${order.total}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {order.status !== "Принят" && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleUpdateOrderStatus(order.id, "Принят")
+                        }
+                        className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
+                      >
+                        Принять
+                      </button>
+                    )}
+                    {order.status !== "Не принято" && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleUpdateOrderStatus(order.id, "Не принято")
+                        }
+                        className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500"
+                      >
+                        Отклонить
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">

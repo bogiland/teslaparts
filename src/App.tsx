@@ -20,6 +20,7 @@ import Cart, { type CartItem } from "./pages/Cart";
 import Favorites from "./pages/Favorites";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
+import Profile from "./pages/Profile";
 import Register from "./pages/Register";
 
 export default function App() {
@@ -159,6 +160,10 @@ export default function App() {
     );
   };
 
+  const handleClearCart = () => {
+    setCartItems([]);
+  };
+
   const handleLogout = () => {
     clearCurrentUser();
     setCurrentUserState(null);
@@ -207,10 +212,13 @@ export default function App() {
                   onIncrease={handleIncreaseCartItem}
                   onDecrease={handleDecreaseCartItem}
                   onRemove={handleRemoveCartItem}
+                  currentUser={currentUser}
+                  onClearCart={handleClearCart}
                 />
               }
             />
             <Route path="/login" element={<Login onLogin={handleLogin} />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="/register" element={<Register />} />
             <Route
               path="/admin"

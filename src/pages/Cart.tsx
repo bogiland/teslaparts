@@ -1,6 +1,7 @@
 import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import type { CurrentUser } from "../lib/auth";
 import type { Product } from "../data/products";
 
 export type CartItem = {
@@ -10,16 +11,20 @@ export type CartItem = {
 
 type CartProps = {
   cartItems: CartItem[];
+  currentUser: CurrentUser | null;
   onIncrease: (productId: number) => void;
   onDecrease: (productId: number) => void;
   onRemove: (productId: number) => void;
+  onClearCart: () => void;
 };
 
 export default function Cart({
   cartItems,
+  currentUser,
   onIncrease,
   onDecrease,
   onRemove,
+  onClearCart,
 }: CartProps) {
   const total = cartItems.reduce(
     (sum, item) => sum + item.product.price * item.quantity,
@@ -50,9 +55,51 @@ export default function Cart({
   }
 
   const [notice, setNotice] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleBuy = () => {
-    setNotice("Спасибо за покупку! Ваш заказ принят.");
+  const handleBuy = async () => {
+    if (!currentUser) {
+      setNotice("Сначала войдите, чтобы оформить заказ.");
+      return;
+    }
+
+    setLoading(true);
+    setNotice(null);
+
+    try {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${currentUser.token}`,
+        },
+        body: JSON.stringify({
+          items: cartItems.map(({ product, quantity }) => ({
+            productId: product.id,
+            name: product.name,
+            price: product.price,
+            quantity,
+          })),
+        }),
+      });
+
+      const responseBody = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(responseBody?.message ?? "Не удалось оформить заказ.");
+      }
+
+      setNotice("Заказ принят! Проверьте статус в личном кабинете.");
+      onClearCart();
+    } catch (error) {
+      console.error("Order failed:", error);
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : "Произошла ошибка при оформлении заказа.",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -163,10 +210,16 @@ export default function Cart({
             <button
               type="button"
               onClick={handleBuy}
-              className="w-full rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500"
+              disabled={loading}
+              className="w-full rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Buy now
+              {loading ? "Processing..." : "Buy now"}
             </button>
+            {!currentUser && (
+              <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Войдите, чтобы отправить заказ и увидеть его в личном кабинете.
+              </div>
+            )}
             {notice && (
               <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                 {notice}
