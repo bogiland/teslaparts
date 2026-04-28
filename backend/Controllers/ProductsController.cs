@@ -82,6 +82,8 @@ namespace TeslaStore.Controllers
             }
             catch (KeyNotFoundException)
             {
+                            return NotFound();
+
             }
         }
     }
