@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using TeslaStore.Attributes;
+using TeslaStore.BLL.Services;
 using TeslaStore.Constants;
 using TeslaStore.Models;
 
@@ -10,9 +11,12 @@ namespace TeslaStore.Controllers
     [Route("api/[controller]")]
     public class OrdersController : ControllerBase
     {
-        private static readonly List<OrderModel> Orders = [];
-        private static readonly object OrdersLock = new();
-        private static readonly string[] AllowedStatuses = ["Ожидает", "Принят", "Не принято"];
+        private readonly IOrderService _orderService;
+
+        public OrdersController(IOrderService orderService)
+        {
+            _orderService = orderService;
+        }
 
         [HttpGet]
         [AdminMod(RoleNames.Visitor)]
@@ -26,20 +30,29 @@ namespace TeslaStore.Controllers
                 return Unauthorized(new { message = "Unauthorized" });
             }
 
-            lock (OrdersLock)
+            var orders = _orderService.GetOrders(username, string.Equals(role, RoleNames.Admin, StringComparison.Ordinal));
+            return Ok(orders);
+        }
+
+        [HttpGet("{id:int}")]
+        [AdminMod(RoleNames.Visitor)]
+        public IActionResult GetOrderById(int id)
+        {
+            var username = User.FindFirstValue(ClaimTypes.Name);
+            var role = User.FindFirstValue(ClaimTypes.Role);
+
+            if (string.IsNullOrWhiteSpace(username))
             {
-                if (string.Equals(role, RoleNames.Admin, StringComparison.Ordinal))
-                {
-                    return Ok(Orders.OrderByDescending(order => order.CreatedAt).ToList());
-                }
-
-                var userOrders = Orders
-                    .Where(order => string.Equals(order.Username, username, StringComparison.OrdinalIgnoreCase))
-                    .OrderByDescending(order => order.CreatedAt)
-                    .ToList();
-
-                return Ok(userOrders);
+                return Unauthorized(new { message = "Unauthorized" });
             }
+
+            var order = _orderService.GetOrderById(id, username, string.Equals(role, RoleNames.Admin, StringComparison.Ordinal));
+            if (order == null)
+            {
+                return NotFound(new { message = "Order not found" });
+            }
+
+            return Ok(order);
         }
 
         [HttpPost]
@@ -52,67 +65,48 @@ namespace TeslaStore.Controllers
                 return Unauthorized(new { message = "Unauthorized" });
             }
 
-            if (model.Items.Count == 0)
+            try
             {
-                return BadRequest(new { message = "Корзина пуста." });
+                var order = _orderService.CreateOrder(username, model);
+                return CreatedAtAction(nameof(GetOrderById), new { id = order.Id }, order);
             }
-
-            var items = model.Items
-                .Where(item => item.ProductId > 0 && !string.IsNullOrWhiteSpace(item.Name) && item.Price >= 0 && item.Quantity > 0)
-                .Select(item => new OrderItemModel
-                {
-                    ProductId = item.ProductId,
-                    Name = item.Name.Trim(),
-                    Price = item.Price,
-                    Quantity = item.Quantity
-                })
-                .ToList();
-
-            if (items.Count == 0)
+            catch (ArgumentException ex)
             {
-                return BadRequest(new { message = "Корзина пуста." });
+                return BadRequest(new { message = ex.Message });
             }
-
-            OrderModel order;
-            lock (OrdersLock)
-            {
-                var nextId = Orders.Count == 0 ? 1 : Orders.Max(existingOrder => existingOrder.Id) + 1;
-                order = new OrderModel
-                {
-                    Id = nextId,
-                    Username = username,
-                    Items = items,
-                    Total = items.Sum(item => item.Price * item.Quantity),
-                    Status = "Ожидает",
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                Orders.Add(order);
-            }
-
-            return CreatedAtAction(nameof(GetOrders), new { id = order.Id }, order);
         }
 
         [HttpPut("{id:int}/status")]
         [AdminMod(RoleNames.Admin)]
         public IActionResult UpdateOrderStatus(int id, [FromBody] UpdateOrderStatusModel model)
         {
-            if (!AllowedStatuses.Contains(model.Status, StringComparer.Ordinal))
+            try
             {
-                return BadRequest(new { message = "Недопустимый статус заказа." });
-            }
-
-            lock (OrdersLock)
-            {
-                var order = Orders.FirstOrDefault(existingOrder => existingOrder.Id == id);
+                var order = _orderService.UpdateOrderStatus(id, model.Status);
                 if (order == null)
                 {
                     return NotFound(new { message = "Order not found" });
                 }
 
-                order.Status = model.Status;
                 return Ok(order);
             }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpDelete("{id:int}")]
+        [AdminMod(RoleNames.Admin)]
+        public IActionResult DeleteOrder(int id)
+        {
+            var deleted = _orderService.DeleteOrder(id);
+            if (!deleted)
+            {
+                return NotFound(new { message = "Order not found" });
+            }
+
+            return NoContent();
         }
     }
 }

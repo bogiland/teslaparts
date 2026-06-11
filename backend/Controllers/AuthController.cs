@@ -5,6 +5,8 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using TeslaStore.Constants;
+using TeslaStore.DAL.Models;
+using TeslaStore.Data;
 using TeslaStore.Models;
 
 namespace TeslaStore.Controllers
@@ -16,15 +18,18 @@ namespace TeslaStore.Controllers
         private readonly UserManager<IdentityUser> _userManager;
         private readonly SignInManager<IdentityUser> _signInManager;
         private readonly IConfiguration _configuration;
+        private readonly AppDbContext _dbContext;
 
         public AuthController(
             UserManager<IdentityUser> userManager,
             SignInManager<IdentityUser> signInManager,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            AppDbContext dbContext)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _configuration = configuration;
+            _dbContext = dbContext;
         }
 
         [HttpPost("register")]
@@ -57,13 +62,18 @@ namespace TeslaStore.Controllers
             var roleResult = await _userManager.AddToRoleAsync(user, defaultRole);
             if (!roleResult.Succeeded)
             {
-                // Delete user if role assignment failed
                 await _userManager.DeleteAsync(user);
                 var message = $"Не удалось назначить роль пользователю: {string.Join(" ", roleResult.Errors.Select(error => error.Description))}";
                 return BadRequest(new { message });
             }
 
-            return Ok(new { message = "Пользователь зарегистрирован." });
+            _dbContext.UserProfiles.Add(new UserProfileEntity
+            {
+                IdentityUserId = user.Id
+            });
+            await _dbContext.SaveChangesAsync();
+
+            return Created(string.Empty, new { message = "Пользователь зарегистрирован." });
         }
 
         [HttpPost("login")]
@@ -84,13 +94,12 @@ namespace TeslaStore.Controllers
             var roles = await _userManager.GetRolesAsync(user);
             var role = roles.FirstOrDefault();
 
-            // Assign default role if user has no role (this can happen if registration had issues)
             if (string.IsNullOrEmpty(role))
             {
                 var defaultRole = string.Equals(model.Username, "admin", StringComparison.OrdinalIgnoreCase)
                     ? RoleNames.Admin
                     : RoleNames.User;
-                
+
                 await _userManager.AddToRoleAsync(user, defaultRole);
                 role = defaultRole;
             }
@@ -101,15 +110,16 @@ namespace TeslaStore.Controllers
                 new Claim(ClaimTypes.Role, role)
             };
 
-            var key = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? "default-secret-key"));
+            var jwtKey = _configuration["Jwt:Key"]
+                ?? throw new InvalidOperationException("Jwt:Key is not configured.");
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(
                 issuer: _configuration["Jwt:Issuer"] ?? "TeslaStore",
                 audience: _configuration["Jwt:Audience"] ?? "TeslaStore",
                 claims: claims,
-                expires: DateTime.Now.AddHours(1),
+                expires: DateTime.UtcNow.AddHours(1),
                 signingCredentials: creds);
 
             return Ok(new

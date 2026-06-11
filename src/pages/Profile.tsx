@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
+import { apiUrl } from "../lib/api";
 import { getCurrentUser, type CurrentUser } from "../lib/auth";
 
 type OrderItem = {
@@ -12,6 +13,7 @@ type OrderItem = {
 type Order = {
   id: number;
   username: string;
+  phone?: string;
   items: OrderItem[];
   total: number;
   status: string;
@@ -20,7 +22,9 @@ type Order = {
 
 export default function Profile() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(true);
+  const [phoneLoading, setPhoneLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const currentUser = getCurrentUser();
@@ -29,33 +33,107 @@ export default function Profile() {
   }
 
   const fetchOrders = async () => {
+    if (!currentUser) {
+      setNotice("Не удалось получить данные пользователя.");
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setNotice(null);
 
     try {
-      const response = await fetch("/api/orders", {
+      console.log("Fetching orders for user:", currentUser.username);
+      console.log("Token:", currentUser.token ? "Present" : "Missing");
+
+      const response = await fetch(apiUrl("/api/orders"), {
+        headers: {
+          Authorization: `Bearer ${currentUser.token}`,
+        },
+      });
+
+      console.log("Response status:", response.status);
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null);
+        const serverMessage = errorBody?.message ? ` ${errorBody.message}` : "";
+        console.error("Server error:", errorBody);
+        throw new Error(
+          `Не удалось загрузить заказы (${response.status}).${serverMessage}`,
+        );
+      }
+
+      const data = (await response.json()) as Order[];
+      console.log("Orders received:", data);
+      setOrders(data);
+    } catch (error) {
+      console.error("Fetch error:", error);
+      if (error instanceof Error) {
+        setNotice(error.message);
+      } else {
+        setNotice("Произошла ошибка при загрузке истории заказов.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchProfile = async () => {
+    try {
+      const response = await fetch(apiUrl("/api/profile"), {
         headers: {
           Authorization: `Bearer ${currentUser.token}`,
         },
       });
 
       if (!response.ok) {
-        throw new Error("Не удалось загрузить заказы.");
+        return;
       }
 
-      const data = (await response.json()) as Order[];
-      setOrders(data);
+      const data = (await response.json()) as { phone?: string };
+      setPhone(data.phone ?? "");
     } catch (error) {
-      console.error(error);
-      setNotice("Произошла ошибка при загрузке истории заказов.");
+      console.error("Fetch profile error:", error);
+    }
+  };
+
+  const handleSavePhone = async () => {
+    setPhoneLoading(true);
+    setNotice(null);
+
+    try {
+      const response = await fetch(apiUrl("/api/profile"), {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${currentUser.token}`,
+        },
+        body: JSON.stringify({ phone }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Не удалось сохранить номер телефона.");
+      }
+
+      const data = (await response.json()) as { phone?: string };
+      setPhone(data.phone ?? "");
+      setNotice("Номер телефона сохранен.");
+    } catch (error) {
+      console.error("Save phone error:", error);
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : "Произошла ошибка при сохранении телефона.",
+      );
     } finally {
-      setLoading(false);
+      setPhoneLoading(false);
     }
   };
 
   useEffect(() => {
+    void fetchProfile();
     void fetchOrders();
-  }, []);
+  }, [currentUser?.username]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 pt-24 sm:px-6 lg:px-8">
@@ -75,6 +153,27 @@ export default function Profile() {
           {notice}
         </div>
       )}
+
+      <div className="mb-8 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-semibold text-zinc-900">Телефон</h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+          <input
+            type="tel"
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+            placeholder="+373..."
+            className="rounded-lg border border-zinc-300 px-4 py-3 text-zinc-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
+          />
+          <button
+            type="button"
+            onClick={handleSavePhone}
+            disabled={phoneLoading}
+            className="rounded-lg bg-zinc-900 px-5 py-3 font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {phoneLoading ? "Сохранение..." : "Сохранить"}
+          </button>
+        </div>
+      </div>
 
       <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
         <h2 className="text-xl font-semibold text-zinc-900">Мои заказы</h2>

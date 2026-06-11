@@ -1,23 +1,11 @@
 {
   "Version": 1,
-  "Hash": "vplUAhEq6NfcI/cS6Uo1Z76ZvVzobmWQkED6IW/Hs40=",
+  "Hash": "WZd1wS/CEmJSIvPWbFwQ4UzOOPnIoIMXN4FJzWDZlks=",
   "Source": "TeslaStore",
   "BasePath": "_content/TeslaStore",
   "Mode": "Default",
   "ManifestType": "Build",
-  "ReferencedProjectsConfiguration": [
-    {
-      "Identity": "C:\\Users\\ZEPHYRUS\\Tesla Parts New\\TeslaParts\\TeslaParts.csproj",
-      "Version": 2,
-      "Source": "TeslaParts",
-      "GetPublishAssetsTargets": "ComputeReferencedStaticWebAssetsPublishManifest;GetCurrentProjectPublishStaticWebAssetItems",
-      "AdditionalPublishProperties": "",
-      "AdditionalPublishPropertiesToRemove": "WebPublishProfileFile;Configuration;Platform;TargetFramework",
-      "GetBuildAssetsTargets": "GetCurrentProjectBuildStaticWebAssetItems",
-      "AdditionalBuildProperties": "",
-      "AdditionalBuildPropertiesToRemove": "WebPublishProfileFile;Configuration;Platform;TargetFramework"
-    }
-  ],
+  "ReferencedProjectsConfiguration": [],
   "DiscoveryPatterns": [],
   "Assets": []
 }

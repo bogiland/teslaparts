@@ -1,6 +1,7 @@
 import { ArrowRight, Lock, UserRound } from "lucide-react";
 import { useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { apiUrl } from "../lib/api";
 import { getCurrentUser, setCurrentUser, type CurrentUser } from "../lib/auth";
 
 type LoginProps = {
@@ -38,7 +39,7 @@ export default function Login({ onLogin }: LoginProps) {
     setNotice(null);
 
     try {
-      const response = await fetch("/api/auth/login", {
+      const response = await fetch(apiUrl("/api/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),

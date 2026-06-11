@@ -1,6 +1,7 @@
 import { ArrowRight, Lock, UserRound } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { apiUrl } from "../lib/api";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -36,6 +37,16 @@ export default function Register() {
   };
 
   const validationErrors = getValidationErrors(username, password);
+  const usernameError = username.trim().length < 4
+    ? "Имя должно содержать минимум 4 символа."
+    : null;
+  const passwordErrors = [
+    password.length < 5 ? "Пароль должен содержать минимум 5 символов." : null,
+    !/[A-ZА-Я]/.test(password)
+      ? "Пароль должен содержать хотя бы одну заглавную букву."
+      : null,
+    !/\d/.test(password) ? "Пароль должен содержать хотя бы одну цифру." : null,
+  ].filter((error): error is string => Boolean(error));
 
   const handleSubmit = async () => {
     const errors = getValidationErrors(username, password);
@@ -48,7 +59,7 @@ export default function Register() {
     setNotice(null);
 
     try {
-      const response = await fetch("/api/auth/register", {
+      const response = await fetch(apiUrl("/api/auth/register"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
@@ -123,6 +134,9 @@ export default function Register() {
                   className="w-full rounded-lg border border-white/10 bg-zinc-900/80 py-3 pl-10 pr-4 text-white outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/40"
                 />
               </div>
+              {usernameError && (
+                <p className="mt-2 text-sm text-amber-300">{usernameError}</p>
+              )}
             </label>
 
             <label className="block">
@@ -138,6 +152,13 @@ export default function Register() {
                   className="w-full rounded-lg border border-white/10 bg-zinc-900/80 py-3 pl-10 pr-4 text-white outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/40"
                 />
               </div>
+              {passwordErrors.length > 0 && (
+                <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-amber-300">
+                  {passwordErrors.map((error) => (
+                    <li key={error}>{error}</li>
+                  ))}
+                </ul>
+              )}
             </label>
 
             {validationErrors.length > 0 && (

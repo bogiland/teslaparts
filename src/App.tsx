@@ -34,35 +34,48 @@ export default function App() {
   const isAdmin = currentUser?.role === "Администратор";
 
   useEffect(() => {
-    const storedCart = localStorage.getItem("tesla-cart");
     const storedUser = getCurrentUser();
-    const favoriteKey = storedUser
-      ? `tesla-favorites-${storedUser.username}`
-      : "tesla-favorites";
-
-    if (storedCart) {
-      setCartItems(JSON.parse(storedCart) as CartItem[]);
-    }
 
     if (storedUser) {
       setCurrentUserState(storedUser);
+
+      const storedCart = localStorage.getItem(`tesla-cart-${storedUser.username}`);
+      if (storedCart) {
+        setCartItems(JSON.parse(storedCart) as CartItem[]);
+      }
+
+      const storedFavorites = localStorage.getItem(
+        `tesla-favorites-${storedUser.username}`,
+      );
+      if (storedFavorites) {
+        setFavorites(JSON.parse(storedFavorites) as Product[]);
+      }
     }
 
-    const storedFavorites = localStorage.getItem(favoriteKey);
-    if (storedFavorites) {
-      setFavorites(JSON.parse(storedFavorites) as Product[]);
-    }
+    localStorage.removeItem("tesla-cart");
+    localStorage.removeItem("tesla-favorites");
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("tesla-cart", JSON.stringify(cartItems));
-  }, [cartItems]);
+    if (!currentUser) {
+      return;
+    }
+
+    localStorage.setItem(
+      `tesla-cart-${currentUser.username}`,
+      JSON.stringify(cartItems),
+    );
+  }, [cartItems, currentUser]);
 
   useEffect(() => {
-    const favoriteKey = currentUser
-      ? `tesla-favorites-${currentUser.username}`
-      : "tesla-favorites";
-    localStorage.setItem(favoriteKey, JSON.stringify(favorites));
+    if (!currentUser) {
+      return;
+    }
+
+    localStorage.setItem(
+      `tesla-favorites-${currentUser.username}`,
+      JSON.stringify(favorites),
+    );
   }, [favorites, currentUser]);
 
   const cartCount = useMemo(
@@ -71,6 +84,10 @@ export default function App() {
   );
 
   const handleAddToCart = (product: Product) => {
+    if (!currentUser) {
+      return;
+    }
+
     setCartItems((currentItems) => {
       const existingItem = currentItems.find(
         (item) => item.product.id === product.id,
@@ -121,6 +138,10 @@ export default function App() {
   };
 
   const handleToggleFavorite = (product: Product) => {
+    if (!currentUser) {
+      return;
+    }
+
     setFavorites((currentFavorites) => {
       if (currentFavorites.some((item) => item.id === product.id)) {
         return currentFavorites.filter((item) => item.id !== product.id);
@@ -131,33 +152,22 @@ export default function App() {
   };
 
   const handleLogin = (user: CurrentUser) => {
-    const guestFavorites = localStorage.getItem("tesla-favorites");
     const userFavorites = localStorage.getItem(
       `tesla-favorites-${user.username}`,
     );
+    const userCart = localStorage.getItem(`tesla-cart-${user.username}`);
 
     setCurrentUser(user);
     setCurrentUserState(user);
 
-    const guestFavoritesList = guestFavorites
-      ? (JSON.parse(guestFavorites) as Product[])
-      : [];
     const userFavoritesList = userFavorites
       ? (JSON.parse(userFavorites) as Product[])
       : [];
-    const mergedFavorites = [...userFavoritesList];
 
-    guestFavoritesList.forEach((item) => {
-      if (!mergedFavorites.some((favorite) => favorite.id === item.id)) {
-        mergedFavorites.push(item);
-      }
-    });
-
-    setFavorites(mergedFavorites);
-    localStorage.setItem(
-      `tesla-favorites-${user.username}`,
-      JSON.stringify(mergedFavorites),
-    );
+    setFavorites(userFavoritesList);
+    setCartItems(userCart ? (JSON.parse(userCart) as CartItem[]) : []);
+    localStorage.removeItem("tesla-favorites");
+    localStorage.removeItem("tesla-cart");
   };
 
   const handleClearCart = () => {
@@ -168,6 +178,7 @@ export default function App() {
     clearCurrentUser();
     setCurrentUserState(null);
     setFavorites([]);
+    setCartItems([]);
   };
 
   return (
@@ -191,30 +202,39 @@ export default function App() {
                   favorites={favorites}
                   onAddToCart={handleAddToCart}
                   onToggleFavorite={handleToggleFavorite}
+                  isAuthenticated={isAuthenticated}
                 />
               }
             />
             <Route
               path="/favorites"
               element={
-                <Favorites
-                  favorites={favorites}
-                  onAddToCart={handleAddToCart}
-                  onToggleFavorite={handleToggleFavorite}
-                />
+                isAuthenticated ? (
+                  <Favorites
+                    favorites={favorites}
+                    onAddToCart={handleAddToCart}
+                    onToggleFavorite={handleToggleFavorite}
+                  />
+                ) : (
+                  <Navigate to="/login" replace state={{ from: "/favorites" }} />
+                )
               }
             />
             <Route
               path="/cart"
               element={
-                <Cart
-                  cartItems={cartItems}
-                  onIncrease={handleIncreaseCartItem}
-                  onDecrease={handleDecreaseCartItem}
-                  onRemove={handleRemoveCartItem}
-                  currentUser={currentUser}
-                  onClearCart={handleClearCart}
-                />
+                isAuthenticated ? (
+                  <Cart
+                    cartItems={cartItems}
+                    onIncrease={handleIncreaseCartItem}
+                    onDecrease={handleDecreaseCartItem}
+                    onRemove={handleRemoveCartItem}
+                    currentUser={currentUser}
+                    onClearCart={handleClearCart}
+                  />
+                ) : (
+                  <Navigate to="/login" replace state={{ from: "/cart" }} />
+                )
               }
             />
             <Route path="/login" element={<Login onLogin={handleLogin} />} />
@@ -234,7 +254,7 @@ export default function App() {
           </Routes>
         </main>
 
-        <Footer />
+        <Footer isAuthenticated={isAuthenticated} />
       </div>
     </Router>
   );

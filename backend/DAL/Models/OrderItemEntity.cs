@@ -1,11 +1,21 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace TeslaStore.Models
+namespace TeslaStore.DAL.Models
 {
-    public class OrderItemModel
+    public class OrderItemEntity
     {
-        [Range(1, int.MaxValue)]
+        [Key]
+        public int Id { get; set; }
+
+        [Required]
+        public int OrderId { get; set; }
+
+        public OrderEntity? Order { get; set; }
+
+        [Required]
         public int ProductId { get; set; }
+
+        public ProductEntity? Product { get; set; }
 
         [Required]
         [StringLength(200)]

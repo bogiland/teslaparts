@@ -6,15 +6,17 @@ import Hero from "../components/Hero";
 import ProductList from "../components/ProductList";
 import SearchBar from "../components/SearchBar";
 import { products as fallbackProducts, type Category, type Product } from "../data/products";
+import { apiUrl } from "../lib/api";
 
 type HomeProps = {
   cart: Product[];
   onAddToCart: (product: Product) => void;
   favorites: Product[];
   onToggleFavorite: (product: Product) => void;
+  isAuthenticated: boolean;
 };
 
-export default function Home({ cart, onAddToCart, favorites, onToggleFavorite }: HomeProps) {
+export default function Home({ cart, onAddToCart, favorites, onToggleFavorite, isAuthenticated }: HomeProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -27,7 +29,7 @@ export default function Home({ cart, onAddToCart, favorites, onToggleFavorite }:
       setError(null);
 
       try {
-        const response = await fetch("/api/products");
+        const response = await fetch(apiUrl("/api/products"));
         if (!response.ok) {
           throw new Error("Не удалось загрузить каталог с сервера.");
         }
@@ -85,6 +87,7 @@ export default function Home({ cart, onAddToCart, favorites, onToggleFavorite }:
             onAddToCart={onAddToCart}
             favorites={favorites}
             onToggleFavorite={onToggleFavorite}
+            canInteract={isAuthenticated}
           />
         )}
       </section>

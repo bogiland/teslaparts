@@ -1,6 +1,7 @@
 import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { apiUrl } from "../lib/api";
 import type { CurrentUser } from "../lib/auth";
 import type { Product } from "../data/products";
 
@@ -30,11 +31,42 @@ export default function Cart({
     (sum, item) => sum + item.product.price * item.quantity,
     0,
   );
+  const [phone, setPhone] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setPhone("");
+      return;
+    }
+
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch(apiUrl("/api/profile"), {
+          headers: {
+            Authorization: `Bearer ${currentUser.token}`,
+          },
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = (await response.json()) as { phone?: string };
+        setPhone(data.phone ?? "");
+      } catch (error) {
+        console.error("Failed to load phone:", error);
+      }
+    };
+
+    void fetchProfile();
+  }, [currentUser?.token]);
 
   if (cartItems.length === 0) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 sm:py-20">
-        <div className="flex min-h-[28rem] flex-col items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 px-6 text-center">
+        <div className="flex min-h-112 flex-col items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 px-6 text-center">
           <ShoppingCart className="mb-5 h-14 w-14 text-zinc-300" />
           <h1 className="text-3xl font-semibold text-zinc-900">
             Your cart is empty
@@ -54,12 +86,15 @@ export default function Cart({
     );
   }
 
-  const [notice, setNotice] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
   const handleBuy = async () => {
     if (!currentUser) {
       setNotice("Сначала войдите, чтобы оформить заказ.");
+      return;
+    }
+
+    const trimmedPhone = phone.trim();
+    if (!trimmedPhone) {
+      setNotice("Укажите номер телефона перед оформлением заказа.");
       return;
     }
 
@@ -67,13 +102,14 @@ export default function Cart({
     setNotice(null);
 
     try {
-      const response = await fetch("/api/orders", {
+      const response = await fetch(apiUrl("/api/orders"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${currentUser.token}`,
         },
         body: JSON.stringify({
+          phone: trimmedPhone,
           items: cartItems.map(({ product, quantity }) => ({
             productId: product.id,
             name: product.name,
@@ -207,6 +243,18 @@ export default function Cart({
                 ${total}
               </span>
             </div>
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-zinc-700">
+                Phone number
+              </span>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                placeholder="+373..."
+                className="w-full rounded-lg border border-zinc-300 px-4 py-3 text-zinc-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
+              />
+            </label>
             <button
               type="button"
               onClick={handleBuy}

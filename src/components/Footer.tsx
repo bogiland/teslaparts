@@ -1,7 +1,11 @@
 import { BatteryCharging } from "lucide-react";
 import { Link } from "react-router-dom";
 
-export default function Footer() {
+type FooterProps = {
+  isAuthenticated: boolean;
+};
+
+export default function Footer({ isAuthenticated }: FooterProps) {
   return (
     <footer className="mt-auto border-t border-white/10 bg-zinc-950 py-16 text-gray-400">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -45,7 +49,7 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link to="/favorites" className="transition-colors hover:text-emerald-400">
+                <Link to={isAuthenticated ? "/favorites" : "/login"} className="transition-colors hover:text-emerald-400">
                   Избранное
                 </Link>
               </li>

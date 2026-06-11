@@ -6,9 +6,10 @@ type ProductListProps = {
   onAddToCart: (product: Product) => void;
   favorites: Product[];
   onToggleFavorite: (product: Product) => void;
+  canInteract: boolean;
 };
 
-export default function ProductList({ products, onAddToCart, favorites, onToggleFavorite }: ProductListProps) {
+export default function ProductList({ products, onAddToCart, favorites, onToggleFavorite, canInteract }: ProductListProps) {
   if (products.length === 0) {
     return (
       <div className="rounded-3xl border border-gray-100 bg-gray-50 py-16 text-center">
@@ -31,6 +32,7 @@ export default function ProductList({ products, onAddToCart, favorites, onToggle
           onAddToCart={onAddToCart}
           isFavorite={favorites.some((favorite) => favorite.id === product.id)}
           onToggleFavorite={onToggleFavorite}
+          canInteract={canInteract}
         />
       ))}
     </div>

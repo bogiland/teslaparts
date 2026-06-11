@@ -7,6 +7,7 @@ type ProductCardProps = Product & {
   onAddToCart: (product: Product) => void;
   isFavorite: boolean;
   onToggleFavorite: (product: Product) => void;
+  canInteract: boolean;
 };
 
 export default function ProductCard({
@@ -19,6 +20,7 @@ export default function ProductCard({
   onAddToCart,
   isFavorite,
   onToggleFavorite,
+  canInteract,
 }: ProductCardProps) {
   const product = useMemo(
     () => ({ id, name, price, category, image, fallbackImage }),
@@ -32,6 +34,7 @@ export default function ProductCard({
 
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+      {canInteract && (
       <button
         type="button"
         onClick={() => onToggleFavorite(product)}
@@ -45,6 +48,7 @@ export default function ProductCard({
           className={`h-5 w-5 transition-colors ${isFavorite ? "fill-emerald-500 text-emerald-500" : ""}`}
         />
       </button>
+      )}
 
       <div className="relative flex h-64 items-center justify-center overflow-hidden bg-zinc-50 p-6">
         <img
@@ -63,6 +67,7 @@ export default function ProductCard({
         <h3 className="grow text-lg font-medium text-zinc-900">{name}</h3>
         <div className="mt-6 flex items-center justify-between border-t border-gray-100 pt-4">
           <span className="text-2xl font-light text-zinc-900">${price}</span>
+          {canInteract && (
           <button
             type="button"
             onClick={() => onAddToCart(product)}
@@ -72,6 +77,7 @@ export default function ProductCard({
           >
             <ShoppingCart className="h-5 w-5" />
           </button>
+          )}
         </div>
       </div>
     </article>

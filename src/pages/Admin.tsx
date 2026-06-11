@@ -16,6 +16,7 @@ import {
   products as fallbackProducts,
   type Product,
 } from "../data/products";
+import { apiUrl } from "../lib/api";
 import { clearCurrentUser, getCurrentUser } from "../lib/auth";
 
 type RoleName = "Администратор" | "Пользователь" | "Посетитель";
@@ -58,6 +59,7 @@ export default function Admin({ onLogout }: AdminProps) {
     | {
         id: number;
         username: string;
+        phone?: string;
         items: {
           productId: number;
           name: string;
@@ -92,7 +94,7 @@ export default function Admin({ onLogout }: AdminProps) {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/products");
+      const response = await fetch(apiUrl("/api/products"));
       if (!response.ok) {
         throw new Error("Failed to load products");
       }
@@ -110,10 +112,50 @@ export default function Admin({ onLogout }: AdminProps) {
     }
   };
 
+  const fetchOrders = async () => {
+    setOrdersLoading(true);
+    setNotice(null);
+
+    try {
+      console.log(
+        "Admin fetching orders. User:",
+        currentUser?.username,
+        "Role:",
+        currentUser?.role,
+      );
+
+      const response = await fetch(apiUrl("/api/orders"), {
+        headers: authHeaders(),
+      });
+
+      console.log("Admin orders response status:", response.status);
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null);
+        console.error("Server error:", errorBody);
+        throw new Error(
+          `Не удалось загрузить заказы (${response.status}): ${errorBody?.message || "Unknown error"}`,
+        );
+      }
+
+      const data = await response.json();
+      console.log("Admin orders received:", data);
+      setOrders(data);
+    } catch (error) {
+      console.error("Failed to load orders:", error);
+      setOrders([]);
+      setNotice(
+        error instanceof Error ? error.message : "Не удалось загрузить заказы.",
+      );
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
   useEffect(() => {
     void fetchProducts();
     void fetchOrders();
-  }, []);
+  }, [currentUser?.username]);
 
   const filteredProducts = useMemo(
     () =>
@@ -162,7 +204,7 @@ export default function Admin({ onLogout }: AdminProps) {
 
     try {
       if (isAdding) {
-        const response = await fetch("/api/products", {
+        const response = await fetch(apiUrl("/api/products"), {
           method: "POST",
           headers: authHeaders(true),
           body: JSON.stringify(formData),
@@ -172,7 +214,7 @@ export default function Admin({ onLogout }: AdminProps) {
           throw new Error("Create failed");
         }
       } else if (editingProduct) {
-        const response = await fetch(`/api/products/${editingProduct.id}`, {
+        const response = await fetch(apiUrl(`/api/products/${editingProduct.id}`), {
           method: "PUT",
           headers: authHeaders(true),
           body: JSON.stringify(formData),
@@ -200,7 +242,7 @@ export default function Admin({ onLogout }: AdminProps) {
     setNotice(null);
 
     try {
-      const response = await fetch(`/api/products/${id}`, {
+      const response = await fetch(apiUrl(`/api/products/${id}`), {
         method: "DELETE",
         headers: authHeaders(),
       });
@@ -230,7 +272,7 @@ export default function Admin({ onLogout }: AdminProps) {
     setNotice(null);
 
     try {
-      const response = await fetch(`/api/roles/users/${roleForm.username}`, {
+      const response = await fetch(apiUrl(`/api/roles/users/${roleForm.username}`), {
         method: "PUT",
         headers: authHeaders(true),
         body: JSON.stringify(roleForm),
@@ -250,35 +292,11 @@ export default function Admin({ onLogout }: AdminProps) {
     }
   };
 
-  const fetchOrders = async () => {
-    setOrdersLoading(true);
-    setNotice(null);
-
-    try {
-      const response = await fetch("/api/orders", {
-        headers: authHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to load orders");
-      }
-
-      const data = await response.json();
-      setOrders(data);
-    } catch (error) {
-      console.error("Failed to load orders:", error);
-      setOrders([]);
-      setNotice("Не удалось загрузить заказы.");
-    } finally {
-      setOrdersLoading(false);
-    }
-  };
-
   const handleUpdateOrderStatus = async (orderId: number, status: string) => {
     setNotice(null);
 
     try {
-      const response = await fetch(`/api/orders/${orderId}/status`, {
+      const response = await fetch(apiUrl(`/api/orders/${orderId}/status`), {
         method: "PUT",
         headers: authHeaders(true),
         body: JSON.stringify({ status }),
@@ -407,6 +425,12 @@ export default function Admin({ onLogout }: AdminProps) {
                       Пользователь: {order.username}
                     </div>
                   </div>
+                  <div className="text-sm text-zinc-500">
+                    Телефон: {order.phone?.trim() ? order.phone : "не указан"}
+                  </div>
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800">
+                    Phone number: {order.phone?.trim() ? order.phone : "not specified"}
+                  </div>
                   <div className="rounded-full bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800">
                     {order.status}
                   </div>
@@ -474,7 +498,7 @@ export default function Admin({ onLogout }: AdminProps) {
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <div className="flex min-h-[38rem] flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm lg:col-span-1">
+        <div className="flex min-h-152 flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm lg:col-span-1">
           <div className="border-b border-zinc-200 bg-zinc-50 p-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-400" />
@@ -680,7 +704,7 @@ export default function Admin({ onLogout }: AdminProps) {
               </div>
             </div>
           ) : (
-            <div className="flex h-full min-h-[24rem] flex-col items-center justify-center rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-12 text-center">
+            <div className="flex h-full min-h-96 flex-col items-center justify-center rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-12 text-center">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm">
                 <Edit2 className="h-8 w-8 text-zinc-400" />
               </div>

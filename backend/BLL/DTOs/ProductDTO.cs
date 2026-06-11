@@ -1,13 +1,29 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace TeslaStore.BLL.DTOs
 {
     public class ProductDTO
     {
         public int Id { get; set; }
-        public string? Name { get; set; }
+
+        [Required]
+        [StringLength(200)]
+        public string Name { get; set; } = string.Empty;
+
+        [Range(typeof(decimal), "0.01", "1000000")]
         public decimal Price { get; set; }
-        public string? Category { get; set; }
-        public string? Image { get; set; }
-        public string? FallbackImage { get; set; }
+
+        [Required]
+        [StringLength(50)]
+        public string Category { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(500)]
+        public string Image { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(500)]
+        public string FallbackImage { get; set; } = string.Empty;
         
         // Дополнительные поля для демонстрации бизнес-логики (поведения и вычислений)
         public string? FormattedPrice { get; set; }

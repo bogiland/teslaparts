@@ -2,12 +2,13 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using System.Text;
-using TeslaParts.Data;
 using TeslaStore.BLL;
 using TeslaStore.BLL.Services;
 using TeslaStore.Constants;
 using TeslaStore.DAL.Repositories;
+using TeslaStore.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,10 +17,36 @@ builder.Logging.AddConsole();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter JWT token as: Bearer {your token}"
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddIdentity<IdentityUser, IdentityRole>(options =>
     {
@@ -35,6 +62,9 @@ builder.Services.AddIdentity<IdentityUser, IdentityRole>(options =>
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        var jwtKey = builder.Configuration["Jwt:Key"]
+            ?? throw new InvalidOperationException("Jwt:Key is not configured.");
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -44,13 +74,14 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "TeslaStore",
             ValidAudience = builder.Configuration["Jwt:Audience"] ?? "TeslaStore",
             IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? "default-secret-key"))
+                Encoding.UTF8.GetBytes(jwtKey))
         };
     });
 
 builder.Services.AddAutoMapper(typeof(MappingProfile));
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<IOrderService, OrderService>();
 
 builder.Services.AddCors(options =>
 {
@@ -73,11 +104,11 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-await InitializeIdentity(app);
+await InitializeIdentity(app, builder.Configuration);
 
 app.Run();
 
-static async Task InitializeIdentity(WebApplication app)
+static async Task InitializeIdentity(WebApplication app, IConfiguration configuration)
 {
     using var scope = app.Services.CreateScope();
     var services = scope.ServiceProvider;
@@ -95,9 +126,15 @@ static async Task InitializeIdentity(WebApplication app)
     }
 
     var userManager = services.GetRequiredService<UserManager<IdentityUser>>();
-    const string adminUsername = "admin";
-    const string adminEmail = "admin@teslaparts.local";
-    const string adminPassword = "12345678BAN";
+    var adminSettings = configuration.GetSection("SeedAdmin");
+    var adminUsername = adminSettings["Username"] ?? "admin";
+    var adminEmail = adminSettings["Email"] ?? "admin@teslaparts.local";
+    var adminPassword = adminSettings["Password"];
+
+    if (string.IsNullOrWhiteSpace(adminPassword))
+    {
+        throw new InvalidOperationException("SeedAdmin:Password is not configured.");
+    }
 
     var adminUser = await userManager.FindByNameAsync(adminUsername);
     if (adminUser == null)

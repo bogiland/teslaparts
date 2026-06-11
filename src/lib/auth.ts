@@ -1,5 +1,4 @@
 const currentUserKey = "tesla-current-user";
-const ADMIN_TOKEN = "tesla-admin-access-token-v1";
 
 export type CurrentUser = {
   username: string;
@@ -34,7 +33,7 @@ export function clearCurrentUser(): void {
 
 export function isAdminAuthenticated(): boolean {
   const user = getCurrentUser();
-  return user?.role === "Администратор" && user.token === ADMIN_TOKEN;
+  return user?.role === "РђРґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂ" && Boolean(user.token);
 }
 
 export function isUserAuthenticated(): boolean {

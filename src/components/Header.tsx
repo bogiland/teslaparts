@@ -6,7 +6,9 @@ import {
   Menu,
   Settings,
   ShoppingCart,
+  X,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 type HeaderProps = {
@@ -25,11 +27,28 @@ export default function Header({
   onLogout,
 }: HeaderProps) {
   const location = useLocation();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const isActive = (path: string) =>
     location.pathname === path
       ? "font-semibold text-emerald-600"
       : "text-gray-500 hover:text-emerald-600";
+
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [location.pathname]);
+
+  const handleLogoutClick = () => {
+    setIsMenuOpen(false);
+    onLogout();
+  };
+
+  const mobileLinkClass = (path: string) =>
+    `block rounded-lg px-4 py-3 text-sm font-semibold uppercase tracking-wider transition-colors ${
+      location.pathname === path
+        ? "bg-emerald-50 text-emerald-700"
+        : "text-zinc-700 hover:bg-zinc-50 hover:text-emerald-600"
+    }`;
 
   return (
     <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/85 text-zinc-900 shadow-sm backdrop-blur-xl">
@@ -47,15 +66,19 @@ export default function Header({
           <Link to="/" className={`transition-colors ${isActive("/")}`}>
             Catalog
           </Link>
-          <Link
-            to="/favorites"
-            className={`transition-colors ${isActive("/favorites")}`}
-          >
-            Favorites
-          </Link>
-          <Link to="/cart" className={`transition-colors ${isActive("/cart")}`}>
-            Cart
-          </Link>
+          {isAuthenticated && (
+            <>
+              <Link
+                to="/favorites"
+                className={`transition-colors ${isActive("/favorites")}`}
+              >
+                Favorites
+              </Link>
+              <Link to="/cart" className={`transition-colors ${isActive("/cart")}`}>
+                Cart
+              </Link>
+            </>
+          )}
           <Link
             to="/about"
             className={`transition-colors ${isActive("/about")}`}
@@ -99,36 +122,40 @@ export default function Header({
         </nav>
 
         <div className="flex items-center space-x-5">
-          <Link
-            to="/favorites"
-            aria-label="Open favorites"
-            className="relative flex items-center text-gray-500 transition-colors hover:text-emerald-600"
-          >
-            <Heart className="h-6 w-6" />
-            {favoritesCount > 0 && (
-              <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-emerald-600 text-[10px] font-bold text-white shadow-sm">
-                {favoritesCount}
-              </span>
-            )}
-          </Link>
+          {isAuthenticated && (
+            <>
+              <Link
+                to="/favorites"
+                aria-label="Open favorites"
+                className="relative flex items-center text-gray-500 transition-colors hover:text-emerald-600"
+              >
+                <Heart className="h-6 w-6" />
+                {favoritesCount > 0 && (
+                  <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-emerald-600 text-[10px] font-bold text-white shadow-sm">
+                    {favoritesCount}
+                  </span>
+                )}
+              </Link>
 
-          <Link
-            to="/cart"
-            aria-label="Open cart"
-            className="relative flex items-center text-gray-500 transition-colors hover:text-emerald-600"
-          >
-            <ShoppingCart className="h-6 w-6" />
-            {cartCount > 0 && (
-              <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-emerald-600 text-[10px] font-bold text-white shadow-sm">
-                {cartCount}
-              </span>
-            )}
-          </Link>
+              <Link
+                to="/cart"
+                aria-label="Open cart"
+                className="relative flex items-center text-gray-500 transition-colors hover:text-emerald-600"
+              >
+                <ShoppingCart className="h-6 w-6" />
+                {cartCount > 0 && (
+                  <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-emerald-600 text-[10px] font-bold text-white shadow-sm">
+                    {cartCount}
+                  </span>
+                )}
+              </Link>
+            </>
+          )}
 
           {isAuthenticated ? (
             <button
               type="button"
-              onClick={onLogout}
+              onClick={handleLogoutClick}
               aria-label="Sign out"
               className="flex items-center text-gray-500 transition-colors hover:text-emerald-600"
             >
@@ -146,13 +173,67 @@ export default function Header({
 
           <button
             type="button"
-            aria-label="Open menu"
-            className="text-gray-500 hover:text-emerald-600 md:hidden"
+            onClick={() => setIsMenuOpen((open) => !open)}
+            aria-label={isMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={isMenuOpen}
+            className="text-gray-500 transition-colors hover:text-emerald-600 md:hidden"
           >
-            <Menu className="h-6 w-6" />
+            {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
         </div>
       </div>
+
+      {isMenuOpen && (
+        <div className="border-t border-gray-100 bg-white px-4 py-4 shadow-lg md:hidden">
+          <nav className="mx-auto flex max-w-7xl flex-col gap-1">
+            <Link to="/" className={mobileLinkClass("/")}>
+              Catalog
+            </Link>
+            {isAuthenticated && (
+              <>
+                <Link to="/favorites" className={mobileLinkClass("/favorites")}>
+                  Favorites
+                </Link>
+                <Link to="/cart" className={mobileLinkClass("/cart")}>
+                  Cart
+                </Link>
+              </>
+            )}
+            <Link to="/about" className={mobileLinkClass("/about")}>
+              About
+            </Link>
+            {isAuthenticated ? (
+              <>
+                {isAdmin ? (
+                  <Link to="/admin" className={mobileLinkClass("/admin")}>
+                    Admin
+                  </Link>
+                ) : (
+                  <Link to="/profile" className={mobileLinkClass("/profile")}>
+                    Account
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  onClick={handleLogoutClick}
+                  className="rounded-lg px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider text-zinc-700 transition-colors hover:bg-zinc-50 hover:text-emerald-600"
+                >
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link to="/login" className={mobileLinkClass("/login")}>
+                  Sign in
+                </Link>
+                <Link to="/register" className={mobileLinkClass("/register")}>
+                  Register
+                </Link>
+              </>
+            )}
+          </nav>
+        </div>
+      )}
     </header>
   );
 }

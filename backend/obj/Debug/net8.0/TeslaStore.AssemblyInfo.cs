@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TeslaStore")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1a276b3e0a38c85c27ae5d3d03ba47645f2fe82f")]
 [assembly: System.Reflection.AssemblyProductAttribute("TeslaStore")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TeslaStore")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

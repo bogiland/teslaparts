@@ -1,6 +1,7 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
+import fs from "fs";
 import { products as initialProducts } from "./src/data/products";
 
 type UserRole = "Администратор" | "Пользователь" | "Посетитель";
@@ -17,10 +18,23 @@ type OrderItem = {
 type Order = {
   id: number;
   username: string;
+  phone?: string;
   items: OrderItem[];
   total: number;
   status: OrderStatus;
   createdAt: string;
+};
+
+type StoredUser = {
+  username: string;
+  password: string;
+  role: UserRole;
+  phone?: string;
+};
+
+type StoreData = {
+  users: StoredUser[];
+  orders: Order[];
 };
 
 declare global {
@@ -34,13 +48,15 @@ declare global {
 const ADMIN_USERNAME = "admin";
 const ADMIN_PASSWORD = "12345678BAN";
 const ADMIN_TOKEN = "tesla-admin-access-token-v1";
+const DATA_DIR = path.join(process.cwd(), "data");
+const STORE_PATH = path.join(DATA_DIR, "store.json");
 const VALID_ROLES: UserRole[] = ["Администратор", "Пользователь", "Посетитель"];
 
 // Храним данные в памяти для демонстрации
 let productsList = [...initialProducts];
 const users = new Map<
   string,
-  { username: string; password: string; role: UserRole }
+  StoredUser
 >([
   [
     ADMIN_USERNAME,
@@ -52,7 +68,68 @@ const users = new Map<
   ],
 ]);
 
-const orders: Order[] = [];
+let orders: Order[] = [];
+
+function loadStore() {
+  if (!fs.existsSync(STORE_PATH)) {
+    return;
+  }
+
+  try {
+    const data = JSON.parse(fs.readFileSync(STORE_PATH, "utf-8")) as Partial<StoreData>;
+
+    if (Array.isArray(data.users)) {
+      users.clear();
+      for (const user of data.users) {
+        if (user?.username && user?.password && VALID_ROLES.includes(user.role)) {
+          users.set(user.username, {
+            username: user.username,
+            password: user.password,
+            role: user.role,
+            phone: user.phone ?? "",
+          });
+        }
+      }
+    }
+
+    if (!users.has(ADMIN_USERNAME)) {
+      users.set(ADMIN_USERNAME, {
+        username: ADMIN_USERNAME,
+        password: ADMIN_PASSWORD,
+        role: VALID_ROLES[0],
+      });
+    }
+
+    if (Array.isArray(data.orders)) {
+      orders = data.orders;
+    }
+  } catch (error) {
+    console.error("Failed to load data store:", error);
+  }
+}
+
+function saveStore() {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const data: StoreData = {
+      users: Array.from(users.values()),
+      orders,
+    };
+    fs.writeFileSync(STORE_PATH, JSON.stringify(data, null, 2), "utf-8");
+  } catch (error) {
+    console.error("Failed to save data store:", error);
+  }
+}
+
+function getOrderResponse(order: Order) {
+  const user = users.get(order.username);
+  return {
+    ...order,
+    phone: order.phone || user?.phone || "",
+  };
+}
+
+loadStore();
 
 function parseAuthToken(req: express.Request) {
   const authHeader = req.headers.authorization;
@@ -129,6 +206,14 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json()); // Для парсинга JSON в теле запроса
+  app.use((req, res, next) => {
+    res.on("finish", () => {
+      if (["POST", "PUT", "DELETE"].includes(req.method) && res.statusCode < 500) {
+        saveStore();
+      }
+    });
+    next();
+  });
 
   app.post("/api/auth/register", (req, res) => {
     const { username, password } = req.body;
@@ -198,7 +283,45 @@ async function startServer() {
 
     user.role = role as UserRole;
     users.set(username, user);
+    saveStore();
     return res.status(200).json({ message: "Role updated" });
+  });
+
+  app.get("/api/profile", requireAuth, (req, res) => {
+    const user = users.get(req.user!.username);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.json({
+      username: user.username,
+      role: user.role,
+      phone: user.phone ?? "",
+    });
+  });
+
+  app.put("/api/profile", requireAuth, (req, res) => {
+    const user = users.get(req.user!.username);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const phone = typeof req.body.phone === "string" ? req.body.phone.trim() : "";
+    user.phone = phone;
+    users.set(user.username, user);
+
+    for (const order of orders) {
+      if (order.username === user.username && !order.phone) {
+        order.phone = phone;
+      }
+    }
+
+    saveStore();
+    return res.json({
+      username: user.username,
+      role: user.role,
+      phone: user.phone,
+    });
   });
 
   // READ: Получить все товары
@@ -240,9 +363,20 @@ async function startServer() {
 
   app.post("/api/orders", requireAuth, (req, res) => {
     const items = req.body.items as OrderItem[];
+    const phone = typeof req.body.phone === "string" ? req.body.phone.trim() : "";
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "Корзина пуста." });
+    }
+
+    if (!phone) {
+      return res.status(400).json({ message: "Phone number is required." });
+    }
+
+    const user = users.get(req.user!.username);
+    if (user) {
+      user.phone = phone;
+      users.set(user.username, user);
     }
 
     const orderItems = items.map((item) => ({
@@ -260,6 +394,7 @@ async function startServer() {
     const order: Order = {
       id: orders.length > 0 ? Math.max(...orders.map((o) => o.id)) + 1 : 1,
       username: req.user!.username,
+      phone,
       items: orderItems,
       total,
       status: "Ожидает",
@@ -267,16 +402,19 @@ async function startServer() {
     };
 
     orders.push(order);
-    return res.status(201).json(order);
+    saveStore();
+    return res.status(201).json(getOrderResponse(order));
   });
 
   app.get("/api/orders", requireAuth, (req, res) => {
     if (req.user?.role === "Администратор") {
-      return res.json(orders);
+      return res.json(orders.map(getOrderResponse));
     }
 
     return res.json(
-      orders.filter((order) => order.username === req.user?.username),
+      orders
+        .filter((order) => order.username === req.user?.username)
+        .map(getOrderResponse),
     );
   });
 
@@ -294,7 +432,8 @@ async function startServer() {
     }
 
     order.status = status as OrderStatus;
-    return res.status(200).json(order);
+    saveStore();
+    return res.status(200).json(getOrderResponse(order));
   });
 
   // Vite middleware for development

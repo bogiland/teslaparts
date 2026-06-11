@@ -34,6 +34,7 @@ export default function Favorites({ favorites, onAddToCart, onToggleFavorite }: 
           onAddToCart={onAddToCart}
           favorites={favorites}
           onToggleFavorite={onToggleFavorite}
+          canInteract={true}
         />
       )}
     </div>
